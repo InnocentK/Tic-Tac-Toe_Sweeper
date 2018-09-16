@@ -6,3 +6,6 @@ The game plays like normal tic-tac-toe where two players pick positions on a boa
 Additionally this game supports multiple board sizes to play on (3x3, 4x4, 5x5).
 
 This game also has a debug mode (currently only fully works for the 3x3 board) that allows you to get a more in-depth look on how the game is operating as you play.
+
+
+The "Jorge_TTT" files are code from my instructor that I adapted to create the full version of the game in the "QC" files
