@@ -1,0 +1,1145 @@
+     1                                  ; CMSC 313 - Spring 2018 - Project 3 - TicTacToe Sweeper
+     2                                  ; Innocent Kironji
+     3                                  ; wambugu1@umbc.edu
+     4                                  
+     5                                  %define cmpb	cmp byte
+     6                                  %define	cmpd	cmp dword
+     7                                  %define decb	dec byte
+     8                                  %define	decw	dec word
+     9                                  %define incb	inc byte
+    10                                  %define xorb	xor byte
+    11                                  %define movb	mov byte
+    12                                  %define movw	mov word
+    13                                  %define	movd	mov dword
+    14                                  %define movq	mov qword
+    15                                  
+    16                                  section .bss					; Uninitialized data
+    17 00000000 <res 00000008>          	buffer		resb	8
+    18 00000008 <res 00000004>          	dbuffer		resb	4
+    19 0000000C <res 00000008>          	pfunc		resq	1
+    20 00000014 <res 00000004>          	pXbomb		resb	4
+    21 00000018 <res 00000004>          	pObomb		resb	4
+    22                                  
+    23                                  section .data				; Initialized data
+    24                                  	; Text
+    25 00000000 446F20796F75207761-     	mdbg		db		"Do you want to enable debug information?", 0xA
+    26 00000009 6E7420746F20656E61-
+    27 00000012 626C65206465627567-
+    28 0000001B 20696E666F726D6174-
+    29 00000024 696F6E3F0A         
+    30                                  	mdbgl		equ		$ - mdbg
+    31                                  
+    32                                  	; Board size text
+    33 00000029 57686174206B696E64-     	mb_size		db		"What kind of board will you be playing on? Enter 3(for 3x3), 4(for 4x4) or 5(for 5x5).", 0xA
+    34 00000032 206F6620626F617264-
+    35 0000003B 2077696C6C20796F75-
+    36 00000044 20626520706C617969-
+    37 0000004D 6E67206F6E3F20456E-
+    38 00000056 746572203328666F72-
+    39 0000005F 20337833292C203428-
+    40 00000068 666F72203478342920-
+    41 00000071 6F72203528666F7220-
+    42 0000007A 357835292E0A       
+    43                                  	mb_sizel	equ		$ - mb_size
+    44                                  
+    45 00000080 496E76616C69642062-     	msz_err		db		"Invalid board size entered", 0xA
+    46 00000089 6F6172642073697A65-
+    47 00000092 20656E74657265640A 
+    48                                  	msz_errl	equ		$ - msz_err
+    49                                  
+    50                                  	; Bomb text
+    51 0000009B 2C2077686572652077-     	mbomb		db		", where would you like to place your bomb?", 0xA
+    52 000000A4 6F756C6420796F7520-
+    53 000000AD 6C696B6520746F2070-
+    54 000000B6 6C61636520796F7572-
+    55 000000BF 20626F6D623F0A     
+    56                                  	mbombl		equ		$ - mbomb
+    57                                  
+    58 000000C6 496E636F7272656374-     	mbomb_err	db		"Incorrect bomb location", 0xA
+    59 000000CF 20626F6D62206C6F63-
+    60 000000D8 6174696F6E0A       
+    61                                  	mbomb_errl	equ		$ - mbomb_err
+    62                                  
+    63 000000DE 426F6D62206578706C-     	mexplode	db		"Bomb exploded", 0xA
+    64 000000E7 6F6465640A         
+    65                                  	mexplodel	equ		$ - mexplode
+    66                                  
+    67                                  	; Player text
+    68 000000EC 506C617965722058        	mPXO		db		"Player X"
+    69                                  	mPXOl		equ		$ - mPXO
+    70                                  	
+    71 000000F4 2C2063686F6F736520-     	mplay2_3x3	db		", choose your location (0-8):", 0xA, "Current board:", 0xA
+    72 000000FD 796F7572206C6F6361-
+    73 00000106 74696F6E2028302D38-
+    74 0000010F 293A0A43757272656E-
+    75 00000118 7420626F6172643A0A 
+    76                                  	mplay2l_3x3	equ		$ - mplay2_3x3
+    77 00000121 2C2063686F6F736520-     	mplay2_4x4	db		", choose your location (0-15):", 0xA, "Current board:", 0xA
+    78 0000012A 796F7572206C6F6361-
+    79 00000133 74696F6E2028302D31-
+    80 0000013C 35293A0A4375727265-
+    81 00000145 6E7420626F6172643A-
+    82 0000014E 0A                 
+    83                                  	mplay2l_4x4	equ		$ - mplay2_4x4
+    84 0000014F 2C2063686F6F736520-     	mplay2_5x5	db		", choose your location (0-24):", 0xA, "Current board:", 0xA
+    85 00000158 796F7572206C6F6361-
+    86 00000161 74696F6E2028302D32-
+    87 0000016A 34293A0A4375727265-
+    88 00000173 6E7420626F6172643A-
+    89 0000017C 0A                 
+    90                                  	mplay2l_5x5	equ		$ - mplay2_5x5
+    91                                  
+    92                                  	; Win condition text
+    93 0000017D 2077696E73210A          	mwin2		db		" wins!", 0xA
+    94                                  	mwin2l		equ		$ - mwin2
+    95                                  	spot		equ		7		; Offset of X/O
+    96                                  	magic		equ		0x17		; Magic! =D
+    97                                  
+    98 00000184 497427732061206472-     	mtie		db		"It's a draw (tie)!", 0xA
+    99 0000018D 617720287469652921-
+   100 00000196 0A                 
+   101                                  	mtiel		equ		$ - mtie
+   102 00000197 46696E616C20626F61-     	mfinal		db		"Final board:", 0xA
+   103 000001A0 72643A0A           
+   104                                  	mfinall		equ		$ - mfinal
+   105 000001A4 54686174206C6F6361-     	merr		db		"That location is out of range or already taken.", 0xA
+   106 000001AD 74696F6E206973206F-
+   107 000001B6 7574206F662072616E-
+   108 000001BF 6765206F7220616C72-
+   109 000001C8 656164792074616B65-
+   110 000001D1 6E2E0A             
+   111                                  	merrl		equ		$ - merr
+   112                                  
+   113                                  	; 3x3 game board
+   114 000001D4 207C207C200A            	pbd1_3x3	db		" | | ", 0xA
+   115                                  	pbd1l_3x3	equ		$ - pbd1_3x3
+   116 000001DA 2D2D2D2D2D0A            	pbd2_3x3	db		"-----", 0xA
+   117                                  	pbd2l_3x3	equ		$ - pbd2_3x3
+   118                                  
+   119                                  	; 3x3 debug board
+   120 000001E0 203031323334353637-     	dbd1_3x3	db		" 012345678 ", 0xA, "["
+   121 000001E9 38200A5B           
+   122                                  	dbd1l_3x3	equ		$ - dbd1_3x3
+   123 000001ED 202020202020202020      	board_3x3	db		"         "	; 3x3 linearized game board
+   124                                  	bdl_3x3		equ		$ - board_3x3
+   125 000001F6 5D0A                    	dbd2_3x3	db		"]", 0xA
+   126                                  	dbd2l_3x3	equ		$ - dbd2_3x3
+   127                                  
+   128                                  	; 4x4 game board
+   129 000001F8 207C207C207C200A        	pbd1_4x4	db		" | | | ", 0xA
+   130                                  	pbd1l_4x4	equ		$ - pbd1_4x4
+   131 00000200 2D2D2D2D2D2D2D0A        	pbd2_4x4	db		"-------", 0xA
+   132                                  	pbd2l_4x4	equ		$ - pbd2_4x4
+   133                                  
+   134                                  	; 4x4 debug board
+   135 00000208 203031323334353637-     	dbd1_4x4	db		" 0123456789ABCDEF ", 0xA, "[" 
+   136 00000211 383941424344454620-
+   137 0000021A 0A5B               
+   138                                  	dbd1l_4x4	equ		$ - dbd1_4x4
+   139 0000021C 202020202020202020-     	board_4x4	db		"                "	; 4x4 linearized game board
+   140 00000225 20202020202020     
+   141                                  	bdl_4x4		equ		$ - board_4x4
+   142 0000022C 5D0A                    	dbd2_4x4	db		"]", 0xA
+   143                                  	dbd2l_4x4	equ		$ - dbd2_4x4
+   144                                  
+   145                                  	; 5x5 game board
+   146 0000022E 207C207C207C207C20-     	pbd1_5x5	db		" | | | | ", 0xA
+   147 00000237 0A                 
+   148                                  	pbd1l_5x5	equ		$ - pbd1_5x5
+   149 00000238 2D2D2D2D2D2D2D2D2D-     	pbd2_5x5	db		"---------", 0xA
+   150 00000241 0A                 
+   151                                  	pbd2l_5x5	equ		$ - pbd2_5x5
+   152                                  
+   153                                  	; 5x5 debug board
+   154 00000242 203031323334353637-     	dbd1_5x5	db		" 0123456789ABCDEF... ", 0xA, "[" 
+   155 0000024B 38394142434445462E-
+   156 00000254 2E2E200A5B         
+   157                                  	dbd1l_5x5	equ		$ - dbd1_5x5
+   158 00000259 202020202020202020-     	board_5x5	db		"                         "	; 5x5 linearized game board
+   159 00000262 202020202020202020-
+   160 0000026B 20202020202020     
+   161                                  	bdl_5x5		equ		$ - board_5x5
+   162 00000272 5D0A                    	dbd2_5x5	db		"]", 0xA
+   163                                  	dbd2l_5x5	equ		$ - dbd2_5x5
+   164                                  
+   165                                  	; More debug text
+   166 00000274 43757272656E742062-     	ebd1_3x3	db	"Current board (hex):", 0xA, "  0  1  2  3  4  5  6  7  8 ", 0xA, "["
+   167 0000027D 6F6172642028686578-
+   168 00000286 293A0A202030202031-
+   169 0000028F 202032202033202034-
+   170 00000298 202035202036202037-
+   171 000002A1 202038200A5B       
+   172                                  	ebd1l_3x3	equ		$ - ebd1_3x3
+   173                                  	
+   174 000002A7 43757272656E742062-     	ebd1_4x4	db	"Current board (hex):", 0xA, "  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F ", 0xA, "["
+   175 000002B0 6F6172642028686578-
+   176 000002B9 293A0A202030202031-
+   177 000002C2 202032202033202034-
+   178 000002CB 202035202036202037-
+   179 000002D4 202038202039202041-
+   180 000002DD 202042202043202044-
+   181 000002E6 202045202046200A5B 
+   182                                  	ebd1l_4x4	equ		$ - ebd1_4x4
+   183                                  	
+   184 000002EF 323020353820323020-     	eboard		db		"20 58 20 4F 20 58 20 20 4F"	; Hex linearized game board
+   185 000002F8 344620323020353820-
+   186 00000301 3230203230203446   
+   187                                  	el		equ		$ - eboard
+   188 00000309 5D0A                    	ebd2		db		"]", 0xA
+   189                                  	ebd2l		equ		$ - ebd2
+   190                                  
+   191 0000030B 303132333435363738-     	hexdigits	db		'0123456789ABCDEF'
+   192 00000314 39414243444546     
+   193 0000031B 43757272656E742062-     	mbd1		db		"Current board (mem):", 0xA, "&board = 0x"
+   194 00000324 6F61726420286D656D-
+   195 0000032D 293A0A26626F617264-
+   196 00000336 203D203078         
+   197                                  	mbd1l		equ		$ - mbd1
+   198 0000033B 464646464646464646-     	mboard		db		"FFFFFFFFFFFFFFFF"
+   199 00000344 46464646464646     
+   200                                  	ml		equ		$ - mboard
+   201 0000034B 0A2B6F666673657420-     	mbd2		db		0xA, "+offset / hex / ASCII", 0xA
+   202 00000354 2F20686578202F2041-
+   203 0000035D 534349490A         
+   204                                  	mbd2l		equ		$ - mbd2
+   205 00000362 3078302F3A20353868-     	mbd3		db		"0x0/: 58h X", 0xA	; The '/' is not a typo
+   206 0000036B 20580A             
+   207                                  	mbd3l		equ		$ - mbd3
+   208                                  	
+   209                                  	; Pairs used to check for winning conditions
+   210 0000036E 020106030804090902-     	lol_3x3			db		2,1,	6,3,	8,4,	9,9,						2,0,	7,4,	9,9,	9,9,						1,0,	8,5,	6,4,	9,9,						5,4,	6,0,	9,9,	9,9,						5,3,	7,1,	8,0,	6,2,						4,3,	8,2,	9,9,	9,9,						8,7,	3,0,	4,2,	9,9,						8,6,	4,1,	9,9,	9,9,						
+   211 00000377 000704090909090100-
+   212 00000380 080506040909050406-
+   213 00000389 000909090905030701-
+   214 00000392 080006020403080209-
+   215 0000039B 090909080703000402-
+   216 000003A4 090908060401090909-
+   217 000003AD 090706050204000909 
+   218                                  	top_3x3			equ		lol_3x3+7  	; up to 9 moves can be played
+   219                                  	; Relates to how many inputs can be combined in tetrads (does not include "9")
+   220 000003B6 050305030703050305      	kek_3x3			db		5,3,5,3,7,3,5,3,5
+   221                                  
+   222                                  	; 4x4 calculating for win (using triads)
+   223 000003BF 0302010C08040F0A05-     	lol_4x4			db		3,2,1,		12,8,4,		15,10,5,							3,2,0,		13,9,5,		16,16,16,							3,1,0,		14,10,6,	16,16,16,							2,1,0,		15,11,7,	12,9,6,								7,6,5,		12,8,0,		16,16,16,							7,6,4,		13,9,1,		15,10,0,							7,5,4
+   224 000003C8 0302000D0905101010-
+   225 000003D1 0301000E0A06101010-
+   226 000003DA 0201000F0B070C0906-
+   227 000003E3 0706050C0800101010-
+   228 000003EC 0706040D09010F0A00-
+   229 000003F5 0705040E0A020C0903-
+   230 000003FE 0605040F0B03101010-
+   231 00000407 0B0A090C0400101010-
+   232 00000410 0B0A080D05010C0603-
+   233 00000419 0B09080E06020F0500-
+   234 00000422 0A09080F0703101010-
+   235 0000042B 0F0E0D080400090603-
+   236 00000434 0F0E0C090501101010-
+   237 0000043D 0F0D0C0A0602101010-
+   238 00000446 0E0D0C0B07030A0500 
+   239                                  	top_4x4			equ		lol_4x4+15 	; up to 16 moves can be played
+   240                                  	; Relates to how many inputs can be combined in tetrads (does not include "16")
+   241 0000044F 080505080508080505-     	kek_4x4			db		8,5,5,8,5,8,8,5,5,8,8,5,8,5,5,8
+   242 00000458 08080508050508     
+   243                                  
+   244                                  	; 5x5 calculating for win (using tetrads)
+   245 0000045F 04030201140F0A0518-     	lol_5x5		db	4,3,2,1,	20,15,10,5,	24,18,12,6,	25,25,25,25,					4,3,2,0,	21,16,11,6,	25,25,25,25,	25,25,25,25,					4,3,1,0,	22,17,12,7,	25,25,25,25,	25,25,25,25,					4,2,1,0,	23,18,13,8,	25,25,25,25,	25,25,25,25,				
+   246 00000468 120C06191919190403-
+   247 00000471 020015100B06191919-
+   248 0000047A 191919191904030100-
+   249 00000483 16110C071919191919-
+   250 0000048C 191919040201001712-
+   251 00000495 0D0819191919191919-
+   252 0000049E 190302010018130E09-
+   253 000004A7 14100C081919191909-
+   254 000004B0 080706140F0A001919-
+   255 000004B9 191919191919090806-
+   256 000004C2 0515100B0118120C00-
+   257 000004CB 191919190907060516-
+   258 000004D4 110C02191919191919-
+   259 000004DD 19190908070517120D-
+   260 000004E6 0314100C0419191919-
+   261 000004EF 0807060518130E0419-
+   262 000004F8 191919191919190E0D-
+   263 00000501 0C0B140F0500191919-
+   264 0000050A 19191919190E0D0C0A-
+   265 00000513 151006011919191919-
+   266 0000051C 1919190E0D0B0A1611-
+   267 00000525 070218120600141008-
+   268 0000052E 040E0C0B0A17120803-
+   269 00000537 19191919191919190D-
+   270 00000540 0C0B0A181309041919-
+   271 00000549 191919191919131211-
+   272 00000552 10140A050019191919-
+   273 0000055B 191919191312110F15-
+   274 00000564 0B0601140C08041919-
+   275 0000056D 19191312100F160C07-
+   276 00000576 021919191919191919-
+   277 0000057F 1311100F170D080318-
+   278 00000588 0C0600191919191211-
+   279 00000591 100F180E0904191919-
+   280 0000059A 191919191918171615-
+   281 000005A3 0F0A0500100C080419-
+   282 000005AC 19191918171614100B-
+   283 000005B5 060119191919191919-
+   284 000005BE 1918171514110C0702-
+   285 000005C7 191919191919191918-
+   286 000005D0 161514120D08031919-
+   287 000005D9 191919191919171615-
+   288 000005E2 14130E0904120C0600-
+   289 000005EB 19191919           
+   290                                  	top_5x5			equ		lol_5x5+24 	; up to 25 moves can be played
+   291                                  	; Relates to how many inputs can be combined in tetrads (does not include "25")
+   292 000005EF 0B0707070B070B070B-     	kek_5x5		db	11,7,7,7,11,7,11,7,11,7,7,7,15,7,7,7,11,7,11,7,11,7,7,7,11
+   293 000005F8 0707070F0707070B07-
+   294 00000601 0B070B0707070B     
+   295                                  
+   296                                  section .text					; Code
+   297                                  global	_start					; Export entry point
+   298                                  	
+   299                                  print_int:						; ecx: const char* msg, edx: size_t msgl
+   300 00000000 B804000000              	mov		eax,4				; System call number (sys_write)
+   301 00000005 BB01000000              	mov		ebx,1				; First argument: file descriptor (stdout == 1)
+   302 0000000A CD80                    	int		0x80				; Call kernel
+   303 0000000C C3                       ret
+   304                                  
+   305                                  read_int:						; ecx: char* msg, ; edx: size_t msgl
+   306 0000000D B803000000              	mov		eax,3				; System call number (sys_read)
+   307 00000012 31DB                    	xor		ebx,ebx				; First argument: file descriptor (stdin == 0)
+   308 00000014 CD80                    	int		0x80				; Call kernel
+   309 00000016 C3                       ret
+   310                                  
+   311                                  validate:			;used in conjunction with convert to set decimal of the input string
+   312 00000017 31C9                    	xor 		ecx, ecx
+   313 00000019 31C0                    	xor		eax, eax
+   314 0000001B 0FB60C25[01000000]      	movzx		ecx, byte [buffer+1]
+   315 00000023 0FB60425[00000000]      	movzx		eax, byte [buffer]
+   316 0000002B 662D3000                	sub		ax,'0'				; Poor man's atoi
+   317 0000002F C3                       ret
+   318                                  	
+   319                                  bomb_err:
+   320 00000030 E835060000              	call invalid_bomb
+   321                                  set_bomb:
+   322                                  	; Prompt player 1 for their bomb location
+   323 00000035 B9[EC000000]            	mov		ecx,mPXO			; Second argument: pointer to message to write
+   324 0000003A BA08000000              	mov		edx,mPXOl			; Third argument: message length
+   325 0000003F E8BCFFFFFF                  call	print_int
+   326 00000044 B9[9B000000]            	mov		ecx,mbomb
+   327 00000049 BA2B000000              	mov		edx,mbombl
+   328 0000004E E8ADFFFFFF                   call	print_int
+   329                                  	; Read their desired location
+   330 00000053 B9[00000000]            	mov		ecx,buffer
+   331 00000058 BA08000000              	mov		edx,8
+   332 0000005D E8ABFFFFFF                   call 	read_int
+   333 00000062 31C9                    	xor 		ecx, ecx
+   334 00000064 31C0                    	xor		eax, eax
+   335 00000066 0FB60C25[01000000]      	movzx		ecx, byte [buffer+1]
+   336 0000006E 0FB60425[00000000]      	movzx		eax, byte [buffer]
+   337 00000076 662D3000                	sub		ax,'0'				; Poor man's atoi
+   338                                  	; convert number before saving it
+   339 0000007A 81F90A000000            	cmp		ecx,0xA
+   340 00000080 740F                      je	ret_bomb
+   341 00000082 803C25[02000000]0A      	cmpb		[buffer+2],0xA			; Checks for entries using 3 or more digits
+   342 0000008A 75A4                      jne 	bomb_err		
+   343 0000008C E81C000000                   call	convert
+   344                                  ret_bomb: 					; Checks which bomb is being saved
+   345 00000091 803C25[F3000000]58      	cmpb		[mPXO+spot],'X'
+   346 00000099 7509                      jne	ret_pO	
+   347                                  ret_pX:	
+   348 0000009B 66890425[14000000]      	movw		[pXbomb],ax
+   349 000000A3 C3                       ret
+   350                                  ret_pO:
+   351 000000A4 66890425[18000000]      	movw		[pObomb],ax
+   352 000000AC C3                       ret	
+   353                                  	
+   354                                  convert:			;only works for 2-digit numbers
+   355 000000AD 6681E93000              	sub		cx,'0'		
+   356 000000B2 B30A                    	mov		bl,10
+   357 000000B4 F6EB                    	imul		bl
+   358 000000B6 6601C8                  	add		ax, cx
+   359 000000B9 C3                       ret
+   360                                  
+   361                                  bomb_hit:
+   362 000000BA B9[DE000000]            	mov		ecx,mexplode
+   363 000000BF BA0E000000              	mov		edx,mexplodel
+   364 000000C4 E837FFFFFF                   call	print_int
+   365 000000C9 C3                       ret
+   366                                  	
+   367                                  check_line_3x3:					; The offsets are expected in esi and edi
+   368 000000CA 8A1C25[F3000000]        	mov		bl,[mPXO+spot]		; One mark
+   369 000000D1 00DB                    	add		bl,bl			; Two marks
+   370 000000D3 672A9E[ED010000]        	sub		bl,[board_3x3+esi]	; One mark
+   371 000000DA 672A9F[ED010000]        	sub		bl,[board_3x3+edi]	; Zero marks
+   372 000000E1 0F844E020000              jz		win_3x3
+   373 000000E7 C3                       ret
+   374                                  check_line_4x4:					; The offsets are expected in esi, edi and edx
+   375 000000E8 6631DB                  	xor		bx,bx
+   376 000000EB 8A3C25[F3000000]        	mov		bh,[mPXO+spot]		; One mark
+   377 000000F2 88FB                    	mov		bl,bh
+   378 000000F4 00DB                    	add		bl,bl			; Two marks
+   379 000000F6 00FB                    	add		bl,bh			; Three marks	
+   380 000000F8 672A9E[1C020000]        	sub		bl,[board_4x4+esi]	; Two marks
+   381 000000FF 672A9F[1C020000]        	sub		bl,[board_4x4+edi]	; One mark
+   382 00000106 672A9A[1C020000]        	sub		bl,[board_4x4+edx]	; Zero marks
+   383 0000010D 0F8445020000              jz		win_4x4
+   384 00000113 C3                       ret
+   385                                  check_line_5x5:					; The offsets are expected in esi, edi, dx
+   386 00000114 53                      		push	rbx
+   387 00000115 6631DB                  	xor		bx,bx
+   388 00000118 8A1C25[F3000000]        	mov		bl,[mPXO+spot]		; One mark
+   389 0000011F 00DB                    	add		bl,bl			; Two marks
+   390 00000121 00DB                    	add		bl,bl			; Four marks	
+   391 00000123 672A9E[59020000]        	sub		bl,[board_5x5+esi]	; Three marks
+   392 0000012A 672A9F[59020000]        	sub		bl,[board_5x5+edi]	; Two mark
+   393 00000131 672A9A[59020000]        	sub		bl,[board_5x5+edx]	; One mark
+   394 00000138 5A                      		pop	rdx
+   395 00000139 672A9A[59020000]        	sub		bl,[board_5x5+edx]	; Zero marks
+   396 00000140 0F8435020000              jz		win_5x5
+   397 00000146 C3                       ret
+   398                                  
+   399                                  ; Setting bomb locations on final board 
+   400                                  tie_3x3:
+   401 00000147 8B0425[14000000]        	mov		eax,[pXbomb]
+   402 0000014E 67C680[ED010000]31      	movb		[board_3x3+eax],'1' ;1 represents player 1's bomb
+   403 00000156 8B0425[18000000]        	mov		eax,[pObomb]
+   404 0000015D 67C680[ED010000]32      	movb		[board_3x3+eax],'2' ;2 represents player 2's bomb
+   405 00000165 E941000000                jmp	tie
+   406                                  tie_4x4:
+   407 0000016A 8B0425[14000000]        	mov		eax,[pXbomb]
+   408 00000171 67C680[1C020000]31      	movb		[board_4x4+eax],'1'
+   409 00000179 8B0425[18000000]        	mov		eax,[pObomb]
+   410 00000180 67C680[1C020000]32      	movb		[board_4x4+eax],'2'
+   411 00000188 E91E000000                jmp	tie
+   412                                  tie_5x5:
+   413 0000018D 8B0425[14000000]        	mov		eax,[pXbomb]
+   414 00000194 67C680[59020000]31      	movb		[board_5x5+eax],'1'
+   415 0000019C 8B0425[18000000]        	mov		eax,[pObomb]
+   416 000001A3 67C680[59020000]32      	movb		[board_5x5+eax],'2'
+   417                                  ; Fallthrough 
+   418                                  tie:						; No return, (it's a tie)
+   419 000001AB B9[84010000]            	mov		ecx,mtie		; Second argument: pointer to message to write
+   420 000001B0 BA20000000              	mov		edx,mtiel+mfinall	; Third argument: message length
+   421 000001B5 E846FEFFFF                  call	print_int
+   422 000001BA E907020000                jmp			pfinalb
+   423                                  	
+   424                                  check_bomb_3x3:
+   425                                  ; Player can be identified by their mark ('X','O')
+   426 000001BF 80FB58                  	cmpb		bl,'X'	; Assumes player's mark is saved in bl
+   427 000001C2 753D                      jne	pO_3x3
+   428                                  pX_3x3:	
+   429 000001C4 3B0425[18000000]        	cmpd		eax,[pObomb] ; Checks if player 1 hit player 2's bomb
+   430 000001CB 0F8563010000              jne	no_bomb
+   431                                  	; Bombs are revealed on board
+   432 000001D1 8B0425[14000000]        	mov		eax,[pXbomb]
+   433 000001D8 67C680[ED010000]31      	movb		[board_3x3+eax],'1'
+   434 000001E0 8B0425[18000000]        	mov		eax,[pObomb]
+   435 000001E7 67C680[ED010000]40      	movb		[board_3x3+eax],'@'
+   436 000001EF 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+   437 000001F7 E8BEFEFFFF                   call	bomb_hit
+   438 000001FC E998010000                jmp	win
+   439                                  pO_3x3:	
+   440 00000201 3B0425[14000000]        	cmpd		eax,[pXbomb] ; Checks if player 2 hit player 1's bomb
+   441 00000208 0F8526010000              jne	no_bomb
+   442                                  	; Bombs are revealed on board
+   443 0000020E 8B0425[18000000]        	mov		eax,[pObomb]
+   444 00000215 67C680[ED010000]32      	movb		[board_3x3+eax],'2'
+   445 0000021D 8B0425[14000000]        	mov		eax,[pXbomb]
+   446 00000224 67C680[ED010000]21      	movb		[board_3x3+eax],'!'
+   447 0000022C 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+   448 00000234 E881FEFFFF                   call	bomb_hit
+   449 00000239 E95B010000                jmp	win
+   450                                  
+   451                                  check_bomb_4x4:
+   452                                  ; Player can be identified by their mark ('X','O')
+   453 0000023E 80FB58                  	cmpb		bl,'X'	; Assumes player's mark is saved in bl
+   454 00000241 753D                      jne	pO_4x4
+   455                                  pX_4x4:	
+   456 00000243 3B0425[18000000]        	cmpd		eax,[pObomb] ; Checks if player 1 hit player 2's bomb
+   457 0000024A 0F85E4000000              jne	no_bomb
+   458                                  	; Bombs are revealed on board
+   459 00000250 8B0425[14000000]        	mov		eax,[pXbomb]
+   460 00000257 67C680[1C020000]31      	movb		[board_4x4+eax],'1'
+   461 0000025F 8B0425[18000000]        	mov		eax,[pObomb]
+   462 00000266 67C680[1C020000]40      	movb		[board_4x4+eax],'@'
+   463 0000026E 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+   464 00000276 E83FFEFFFF                   call	bomb_hit
+   465 0000027B E919010000                jmp	win
+   466                                  pO_4x4:	
+   467 00000280 3B0425[14000000]        	cmpd		eax,[pXbomb] ; Checks if player 2 hit player 1's bomb
+   468 00000287 0F85A7000000              jne	no_bomb
+   469                                  	; Bombs are revealed on board
+   470 0000028D 8B0425[18000000]        	mov		eax,[pObomb]
+   471 00000294 67C680[1C020000]32      	movb		[board_4x4+eax],'2'
+   472 0000029C 8B0425[14000000]        	mov		eax,[pXbomb]
+   473 000002A3 67C680[1C020000]21      	movb		[board_4x4+eax],'!'
+   474 000002AB 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+   475 000002B3 E802FEFFFF                   call	bomb_hit
+   476 000002B8 E9DC000000                jmp	win
+   477                                  
+   478                                  check_bomb_5x5:
+   479                                  ; Player can be identified by their mark ('X','O')
+   480 000002BD 80FB58                  	cmpb		bl,'X'	; Assumes player's mark is saved in bl
+   481 000002C0 7539                      jne	pO_5x5
+   482                                  pX_5x5:	
+   483 000002C2 3B0425[18000000]        	cmpd		eax,[pObomb] ; Checks if player 1 hit player 2's bomb
+   484 000002C9 7569                      jne	no_bomb
+   485                                  	; Bombs are revealed on board
+   486 000002CB 8B0425[14000000]        	mov		eax,[pXbomb]
+   487 000002D2 67C680[59020000]31      	movb		[board_5x5+eax],'1'
+   488 000002DA 8B0425[18000000]        	mov		eax,[pObomb]
+   489 000002E1 67C680[59020000]40      	movb		[board_5x5+eax],'@'
+   490 000002E9 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+   491 000002F1 E8C4FDFFFF                   call	bomb_hit
+   492 000002F6 E99E000000                jmp	win
+   493                                  pO_5x5:	
+   494 000002FB 3B0425[14000000]        	cmpd		eax,[pXbomb] ; Checks if player 2 hit player 1's bomb
+   495 00000302 7530                      jne	no_bomb
+   496                                  	; Bombs are revealed on board
+   497 00000304 8B0425[18000000]        	mov		eax,[pObomb]
+   498 0000030B 67C680[59020000]32      	movb		[board_5x5+eax],'2'
+   499 00000313 8B0425[14000000]        	mov		eax,[pXbomb]
+   500 0000031A 67C680[59020000]21      	movb		[board_5x5+eax],'!'
+   501 00000322 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+   502 0000032A E88BFDFFFF                   call	bomb_hit
+   503 0000032F E965000000                jmp	win
+   504                                  	
+   505                                  no_bomb:
+   506 00000334 C3                       ret
+   507                                  
+   508                                  ; Setting bomb locations on final board 
+   509                                  win_3x3:
+   510 00000335 8B0425[14000000]        	mov		eax,[pXbomb]
+   511 0000033C 67C680[ED010000]31      	movb		[board_3x3+eax],'1'
+   512 00000344 8B0425[18000000]        	mov		eax,[pObomb]
+   513 0000034B 67C680[ED010000]32      	movb		[board_3x3+eax],'2'
+   514 00000353 E941000000                jmp	win
+   515                                  win_4x4:
+   516 00000358 8B0425[14000000]        	mov		eax,[pXbomb]
+   517 0000035F 67C680[1C020000]31      	movb		[board_4x4+eax],'1'
+   518 00000367 8B0425[18000000]        	mov		eax,[pObomb]
+   519 0000036E 67C680[1C020000]32      	movb		[board_4x4+eax],'2'
+   520 00000376 E91E000000                jmp	win
+   521                                  win_5x5:
+   522 0000037B 8B0425[14000000]        	mov		eax,[pXbomb]
+   523 00000382 67C680[59020000]31      	movb		[board_5x5+eax],'1'
+   524 0000038A 8B0425[18000000]        	mov		eax,[pObomb]
+   525 00000391 67C680[59020000]32      	movb		[board_5x5+eax],'2'
+   526                                  ;Fallthrough 
+   527                                  win:						; No return, (someone won)
+   528 00000399 B9[EC000000]            	mov		ecx,mPXO			; Second argument: pointer to message to write
+   529 0000039E BA08000000              	mov		edx,mPXOl			; Third argument: message length
+   530 000003A3 E858FCFFFF                  call	print_int
+   531 000003A8 B9[7D010000]            	mov		ecx,mwin2			; Second argument: pointer to message to write
+   532 000003AD BA07000000              	mov		edx,mwin2l			; Third argument: message length
+   533 000003B2 E849FCFFFF                  call	print_int
+   534 000003B7 B9[97010000]            	mov		ecx,mfinal			; Second argument: pointer to message to write
+   535 000003BC BA0D000000              	mov		edx,mfinall			; Third argument: message length
+   536 000003C1 E83AFCFFFF                  call	print_int
+   537                                  ; Fallthrough
+   538                                  pfinalb:						; No return, (print final board and exit)
+   539 000003C6 FF1425[0C000000]        	call	[pfunc]
+   540 000003CD B801000000              	mov		eax,1				; System call number (sys_exit)
+   541 000003D2 31DB                    	xor		ebx,ebx				; First syscall argument: exit code
+   542 000003D4 CD80                    	int		0x80				; Call kernel
+   543                                  ; No ret
+   544                                  
+   545                                  ; For a 3x3 Game Debug: 
+   546                                  debug_board_3x3:
+   547 000003D6 B9[E0010000]            	mov		ecx,dbd1_3x3			; Second argument: pointer to message to write
+   548 000003DB BA18000000              	mov		edx,dbd1l_3x3+bdl_3x3+dbd2l_3x3		; Third argument: message length
+   549 000003E0 E81BFCFFFF                  call	print_int
+   550 000003E5 B908000000              	mov		ecx,8				; Locations
+   551                                  hexboard_3x3:
+   552 000003EA 678A99[ED010000]        	mov		bl,[board_3x3+ecx]
+   553 000003F1 66BA3230                	mov		dx,'20'
+   554 000003F5 80FB20                  	cmp		bl,' '
+   555 000003F8 660F44C2                	cmove	ax,dx
+   556 000003FC 66BA3538                	mov		dx,'58'
+   557 00000400 80FB58                  	cmp		bl,'X'
+   558 00000403 660F44C2                	cmove	ax,dx
+   559 00000407 66BA3446                	mov		dx,'4F'
+   560 0000040B 80FB4F                  	cmp		bl,'O'
+   561 0000040E 660F44C2                	cmove	ax,dx
+   562 00000412 67888449[EF020000]      	mov		[eboard+2*ecx+ecx],al
+   563 0000041A 6788A449[F0020000]      	mov		[eboard+2*ecx+ecx+1],ah
+   564 00000422 FFC9                    	dec		ecx
+   565 00000424 79C4                      jns		hexboard_3x3
+   566                                  	;Printing heaxboard
+   567 00000426 B9[74020000]            	mov		ecx,ebd1_3x3			; Second argument: pointer to message to write
+   568 0000042B BA33000000              	mov		edx,ebd1l_3x3		; Third argument: message length
+   569 00000430 E8CBFBFFFF                  call	print_int
+   570 00000435 B9[EF020000]            	mov		ecx,eboard		; Second argument: pointer to message to write
+   571 0000043A BA1C000000              	mov		edx,el+ebd2l		; Third argument: message length
+   572 0000043F E8BCFBFFFF                  call	print_int
+   573 00000444 B9[1B030000]            	mov		ecx,mbd1			; Second argument: pointer to message to write
+   574 00000449 BA47000000              	mov		edx,mbd1l+ml+mbd2l	; Third argument: message length
+   575 0000044E E8ADFBFFFF                  call	print_int
+   576 00000453 48BE-                   	mov		rsi,board_3x3
+   577 00000455 [ED01000000000000] 
+   578 0000045D 48BF-                   	mov		rdi,mbd3
+   579 0000045F [6203000000000000] 
+   580                                  memboard_3x3:
+   581 00000467 FE4703                  	incb	[rdi+3]				; Counter
+   582 0000046A 8A1E                    	mov		bl,[rsi]			; Mark (ASCII)
+   583 0000046C 885F0A                  	mov		[rdi+10],bl
+   584 0000046F 66BA3230                	mov		dx,'20'
+   585 00000473 80FB20                  	cmp		bl,' '
+   586 00000476 660F44C2                	cmove	ax,dx
+   587 0000047A 66BA3538                	mov		dx,'58'
+   588 0000047E 80FB58                  	cmp		bl,'X'
+   589 00000481 660F44C2                	cmove	ax,dx
+   590 00000485 66BA3446                	mov		dx,'4F'
+   591 00000489 80FB4F                  	cmp		bl,'O'
+   592 0000048C 660F44C2                	cmove	ax,dx
+   593 00000490 66894706                	mov		[rdi+6],ax			; Mark (hex)
+   594 00000494 B9[62030000]            	mov		ecx,mbd3			; Second argument: pointer to message to write
+   595 00000499 BA0C000000              	mov		edx,mbd3l			; Third argument: message length
+   596 0000049E E85DFBFFFF                  call	print_int
+   597 000004A3 48FFC6                  	inc		rsi
+   598 000004A6 4881FE[F6010000]        	cmp		rsi,board_3x3+9
+   599 000004AD 75B8                      jne		memboard_3x3
+   600 000004AF C647032F                	movb	[rdi+3],'/'			; Reset counter
+   601 000004B3 C3                       ret
+   602                                  
+   603                                  ; Printing a 3x3 game board: 
+   604                                  print_board_3x3:
+   605 000004B4 31F6                    	xor		esi,esi				; Row
+   606                                  nrow_3x3:
+   607 000004B6 BF02000000              	mov		edi,2				; Col
+   608                                  ncol_3x3:
+   609 000004BB 678A943E[ED010000]      	mov		dl,[board_3x3+esi+edi]	; Src
+   610 000004C3 6788943F[D4010000]      	mov		[pbd1_3x3+edi*2],dl		; Dst
+   611 000004CB FFCF                    	dec		edi
+   612 000004CD 79EC                      jns		ncol_3x3				; Three columns
+   613 000004CF B9[D4010000]            	mov		ecx,pbd1_3x3			; Second argument: pointer to message to write
+   614 000004D4 81C603000000            	add		esi,3				; Next row
+   615 000004DA 81FE09000000            	cmp		esi,9				; Last row
+   616 000004E0 740F                      je		pdone_3x3
+   617 000004E2 BA0C000000              	mov		edx,pbd1l_3x3+pbd2l_3x3		; Third argument: message length
+   618 000004E7 E814FBFFFF                  call	print_int
+   619 000004EC E9C5FFFFFF                jmp		nrow_3x3
+   620                                  
+   621                                  pdone_3x3:
+   622 000004F1 BA06000000              	mov		edx,pbd1l_3x3			; Third argument: message length
+   623 000004F6 E805FBFFFF                  call	print_int
+   624 000004FB C3                       ret
+   625                                  
+   626                                  ; For a 4x4 Game Debug: 
+   627                                  debug_board_4x4:
+   628 000004FC B9[08020000]            	mov		ecx,dbd1_4x4			; Second argument: pointer to message to write
+   629 00000501 BA26000000              	mov		edx,dbd1l_4x4+bdl_4x4+dbd2l_4x4		; Third argument: message length
+   630 00000506 E8F5FAFFFF                  call	print_int
+   631 0000050B B90F000000              	mov		ecx,15				; Locations
+   632                                  hexboard_4x4:
+   633 00000510 678A99[1C020000]        	mov		bl,[board_4x4+ecx]
+   634 00000517 66BA3230                	mov		dx,'20'
+   635 0000051B 80FB20                  	cmp		bl,' '
+   636 0000051E 660F44C2                	cmove	ax,dx
+   637 00000522 66BA3538                	mov		dx,'58'
+   638 00000526 80FB58                  	cmp		bl,'X'
+   639 00000529 660F44C2                	cmove	ax,dx
+   640 0000052D 66BA3446                	mov		dx,'4F'
+   641 00000531 80FB4F                  	cmp		bl,'O'
+   642 00000534 660F44C2                	cmove	ax,dx
+   643 00000538 67888449[EF020000]      	mov		[eboard+2*ecx+ecx],al
+   644 00000540 6788A449[F0020000]      	mov		[eboard+2*ecx+ecx+1],ah
+   645 00000548 FFC9                    	dec		ecx
+   646 0000054A 79C4                      jns		hexboard_4x4
+   647                                  	;Printing heaxboard
+   648 0000054C B9[A7020000]            	mov		ecx,ebd1_4x4			; Second argument: pointer to message to write
+   649 00000551 BA48000000              	mov		edx,ebd1l_4x4		; Third argument: message length
+   650 00000556 E8A5FAFFFF                  call	print_int
+   651 0000055B B9[EF020000]            	mov		ecx,eboard		; Second argument: pointer to message to write
+   652 00000560 BA1C000000              	mov		edx,el+ebd2l		; Third argument: message length
+   653 00000565 E896FAFFFF                  call	print_int
+   654 0000056A B9[1B030000]            	mov		ecx,mbd1			; Second argument: pointer to message to write
+   655 0000056F BA47000000              	mov		edx,mbd1l+ml+mbd2l	; Third argument: message length
+   656 00000574 E887FAFFFF                  call	print_int
+   657 00000579 48BE-                   	mov		rsi,board_4x4
+   658 0000057B [1C02000000000000] 
+   659 00000583 48BF-                   	mov		rdi,mbd3
+   660 00000585 [6203000000000000] 
+   661                                  memboard_4x4:
+   662 0000058D FE4703                  	incb	[rdi+3]				; Counter
+   663 00000590 8A1E                    	mov		bl,[rsi]			; Mark (ASCII)
+   664 00000592 885F0A                  	mov		[rdi+10],bl
+   665 00000595 66BA3230                	mov		dx,'20'
+   666 00000599 80FB20                  	cmp		bl,' '
+   667 0000059C 660F44C2                	cmove	ax,dx
+   668 000005A0 66BA3538                	mov		dx,'58'
+   669 000005A4 80FB58                  	cmp		bl,'X'
+   670 000005A7 660F44C2                	cmove	ax,dx
+   671 000005AB 66BA3446                	mov		dx,'4F'
+   672 000005AF 80FB4F                  	cmp		bl,'O'
+   673 000005B2 660F44C2                	cmove	ax,dx
+   674 000005B6 66894706                	mov		[rdi+6],ax			; Mark (hex)
+   675 000005BA B9[62030000]            	mov		ecx,mbd3			; Second argument: pointer to message to write
+   676 000005BF BA0C000000              	mov		edx,mbd3l			; Third argument: message length
+   677 000005C4 E837FAFFFF                  call	print_int
+   678 000005C9 48FFC6                  	inc		rsi
+   679 000005CC 4881FE[25020000]        	cmp		rsi,board_4x4+9
+   680 000005D3 75B8                      jne		memboard_4x4
+   681 000005D5 C647032F                	movb	[rdi+3],'/'			; Reset counter
+   682 000005D9 C3                       ret
+   683                                  
+   684                                  ; Printing 4x4 game board: 
+   685                                  print_board_4x4:
+   686 000005DA 31F6                    	xor		esi,esi				; Row
+   687                                  nrow_4x4:
+   688 000005DC BF03000000              	mov		edi,3				; Col
+   689                                  ncol_4x4:
+   690 000005E1 678A943E[1C020000]      	mov		dl,[board_4x4+esi+edi]		; Src
+   691 000005E9 6788943F[F8010000]      	mov		[pbd1_4x4+edi*2],dl		; Dst
+   692 000005F1 FFCF                    	dec		edi
+   693 000005F3 79EC                      jns		ncol_4x4				; Four columns
+   694 000005F5 B9[F8010000]            	mov		ecx,pbd1_4x4			; Second argument: pointer to message to write
+   695 000005FA 81C604000000            	add		esi,4				; Next row
+   696 00000600 81FE10000000            	cmp		esi,16				; Last row
+   697 00000606 740F                      je		pdone_4x4
+   698 00000608 BA10000000              	mov		edx,pbd1l_4x4+pbd2l_4x4		; Third argument: message length
+   699 0000060D E8EEF9FFFF                  call	print_int
+   700 00000612 E9C5FFFFFF                jmp		nrow_4x4
+   701                                  
+   702                                  pdone_4x4:
+   703 00000617 BA08000000              	mov		edx,pbd1l_4x4			; Third argument: message length
+   704 0000061C E8DFF9FFFF                  call	print_int
+   705 00000621 C3                       ret
+   706                                  
+   707                                  ; For a 5x5 game:  
+   708                                  print_board_5x5:
+   709 00000622 31F6                    	xor		esi,esi				; Row
+   710                                  nrow_5x5:
+   711 00000624 BF04000000              	mov		edi,4				; Col
+   712                                  ncol_5x5:
+   713 00000629 678A943E[59020000]      	mov		dl,[board_5x5+esi+edi]		; Src
+   714 00000631 6788943F[2E020000]      	mov		[pbd1_5x5+edi*2],dl		; Dst
+   715 00000639 FFCF                    	dec		edi
+   716 0000063B 79EC                      jns		ncol_5x5				; Four columns
+   717 0000063D B9[2E020000]            	mov		ecx,pbd1_5x5			; Second argument: pointer to message to write
+   718 00000642 81C605000000            	add		esi,5				; Next row
+   719 00000648 81FE19000000            	cmp		esi,25				; Last row
+   720 0000064E 740F                      je		pdone_5x5
+   721 00000650 BA14000000              	mov		edx,pbd1l_5x5+pbd2l_5x5		; Third argument: message length
+   722 00000655 E8A6F9FFFF                  call	print_int
+   723 0000065A E9C5FFFFFF                jmp		nrow_5x5
+   724                                  
+   725                                  pdone_5x5:
+   726 0000065F BA0A000000              	mov		edx,pbd1l_5x5			; Third argument: message length
+   727 00000664 E897F9FFFF                  call	print_int
+   728 00000669 C3                       ret
+   729                                  
+   730                                  ; Error message for bomb location 
+   731                                  invalid_bomb:
+   732 0000066A B9[C6000000]            	mov		ecx,mbomb_err
+   733 0000066F BA18000000              	mov		edx,mbomb_errl
+   734 00000674 E887F9FFFF                  call	print_int
+   735 00000679 C3                       ret
+   736                                  	
+   737                                  ; Game Start 
+   738                                  _start:
+   739                                  	; Enable debug?
+   740 0000067A B9[00000000]            	mov		ecx,mdbg			; Second argument: pointer to message to write
+   741 0000067F BA29000000              	mov		edx,mdbgl			; Third argument: message length
+   742 00000684 E877F9FFFF                  call	print_int
+   743                                  	; Read answer
+   744 00000689 B9[08000000]            	mov		ecx,dbuffer			; Store input at location 'buffer'
+   745 0000068E BA08000000              	mov		edx,8 				; Read these many bytes
+   746 00000693 E875F9FFFF                  call	read_int
+   747                                  
+   748                                  	; Choose what kind of game to play
+   749 00000698 B9[29000000]            	mov		ecx,mb_size			; Second argument: pointer to message to write
+   750 0000069D BA57000000              	mov		edx,mb_sizel			; Third argument: message length
+   751 000006A2 E859F9FFFF                  call	print_int
+   752                                  	; Read answer
+   753 000006A7 B9[00000000]            	mov		ecx,buffer			; Store input at location 'buffer'
+   754 000006AC BA08000000              	mov		edx,8 				; Read these many bytes
+   755 000006B1 E857F9FFFF                  call	read_int
+   756                                  	; Switch case
+   757 000006B6 803C25[01000000]0A      	cmpb 		[buffer+1],0xA
+   758 000006BE 7526                      jne		invalid_bsize
+   759 000006C0 803C25[00000000]33      	cmpb 		[buffer],'3'
+   760 000006C8 7430                      je		game_3x3
+   761 000006CA 803C25[00000000]34      	cmpb		[buffer],'4'
+   762 000006D2 0F849A010000              je		game_4x4
+   763 000006D8 803C25[00000000]35      	cmpb		[buffer],'5'
+   764 000006E0 0F8426030000              je		game_5x5
+   765                                  
+   766                                  ; Invalid board size given
+   767                                  invalid_bsize:	
+   768 000006E6 B9[80000000]            	mov		ecx,msz_err			; Second argument: pointer to message to write
+   769 000006EB BA1B000000              	mov		edx,msz_errl			; Third argument: message length
+   770 000006F0 E80BF9FFFF                  call	print_int
+   771 000006F5 E980FFFFFF                jmp	_start
+   772                                  
+   773                                  ; Game used for a 3x3 board 
+   774                                  game_3x3:
+   775                                  ; Player 1 places their bomb 
+   776                                  pXbomb_3x3:	
+   777 000006FA E836F9FFFF                   call	set_bomb
+   778                                  ;Checks for valid input, if invalid reprompts user
+   779 000006FF 3C08                    	cmpb		al,8
+   780 00000701 760A                      jbe	switch_pO_3x3
+   781 00000703 E862FFFFFF                  call	invalid_bomb
+   782 00000708 E9EDFFFFFF                jmp	pXbomb_3x3
+   783                                  
+   784                                  ; Player 2 places their bomb 
+   785                                  switch_pO_3x3:
+   786 0000070D 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Switch marks for next player
+   787                                  pObomb_3x3:	
+   788 00000715 E81BF9FFFF                  call	set_bomb
+   789                                  ;Checks for valid input
+   790 0000071A 3C08                    	cmpb		al,8
+   791 0000071C 760A                      jbe	check_debug_3x3
+   792 0000071E E847FFFFFF                  call	invalid_bomb
+   793 00000723 E9EDFFFFFF                jmp	pObomb_3x3
+   794                                  
+   795                                  ; Game continues after picking bomb location 
+   796                                  check_debug_3x3:
+   797 00000728 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Switch marks for next player
+   798                                  	; Switch case
+   799 00000730 803C25[08000000]59      	cmpb 		[dbuffer],'Y'
+   800 00000738 742F                      je		do_debug_3x3
+   801 0000073A 803C25[08000000]79      	cmpb		[dbuffer],'y'
+   802 00000742 7425                      je		do_debug_3x3
+   803 00000744 803C25[08000000]44      	cmpb		[dbuffer],'D'
+   804 0000074C 741B                      je		do_debug_3x3
+   805 0000074E 803C25[08000000]64      	cmpb		[dbuffer],'d'
+   806 00000756 7411                      je		do_debug_3x3
+   807                                  	; Default
+   808 00000758 48C70425[0C000000]-     	movq		[pfunc],print_board_3x3
+   809 00000760 [B4040000]         
+   810 00000764 E969000000                jmp		play_3x3
+   811                                  do_debug_3x3:
+   812 00000769 48C70425[0C000000]-     	movq		[pfunc],debug_board_3x3
+   813 00000771 [D6030000]         
+   814 00000775 B90F000000              	mov		ecx,15				; Offset of last hexdigit of address
+   815 0000077A 48BA-                   	mov		rdx, board_3x3			; rdx will be tampered with
+   816 0000077C [ED01000000000000] 
+   817 00000784 48BB-                   	mov		rbx, hexdigits			; Table
+   818 00000786 [0B03000000000000] 
+   819                                  memheader_3x3:
+   820 0000078E 4889D0                  	mov		rax,rdx				; Need nibble in al
+   821 00000791 48250F000000            	and		rax,0x000000000000000f
+   822 00000797 D7                      	xlatb						; al updated
+   823 00000798 678881[3B030000]        	mov byte		[mboard+ecx],al
+   824 0000079F FFC9                    	dec		ecx
+   825 000007A1 4889D0                  	mov		rax,rdx				; Need nibble in al
+   826 000007A4 4825F0000000            	and		rax,0x00000000000000f0
+   827 000007AA 48C1E804                	shr		rax,4				; This time, higher nibble
+   828 000007AE D7                      	xlatb						; al updated
+   829 000007AF 678881[3B030000]        	mov byte		[mboard+ecx],al
+   830 000007B6 48C1EA08                	shr		rdx,8				; Next byte (two nibbles)
+   831 000007BA FFC9                    	dec		ecx
+   832 000007BC 79D0                      jns		memheader_3x3
+   833 000007BE E90F000000                jmp		play_3x3
+   834                                  invalid_3x3:
+   835 000007C3 B9[A4010000]            	mov		ecx,merr			; Second argument: pointer to message to write
+   836 000007C8 BA30000000              	mov		edx,merrl			; Third argument: message length
+   837 000007CD E82EF8FFFF                   call	print_int
+   838                                  ; Fallthrough
+   839                                  play_3x3:
+   840                                  	; Print messages and board
+   841 000007D2 B9[EC000000]            	mov		ecx,mPXO			; Second argument: pointer to message to write
+   842 000007D7 BA35000000              	mov		edx,mPXOl+mplay2l_3x3		; Third argument: message length
+   843 000007DC E81FF8FFFF                   call	print_int
+   844 000007E1 FF1425[0C000000]             call	[pfunc]
+   845                                  	; Read input
+   846 000007E8 B9[00000000]            	mov		ecx,buffer			; Store input at location 'buffer'
+   847 000007ED BA08000000              	mov		edx,8 				; Read these many bytes
+   848 000007F2 E816F8FFFF                   call	read_int
+   849                                      ; Validate and convert (necessary to check two digit numbers)
+   850 000007F7 E81BF8FFFF                   call	validate
+   851 000007FC 6681F90A00              	cmp		cx,0xA
+   852 00000801 740F                      je		check_range_3x3
+   853 00000803 803C25[02000000]0A      	cmpb		[buffer+2],0xA
+   854 0000080B 75B6                      jne		invalid_3x3
+   855 0000080D E89BF8FFFF                   call 	convert
+   856                                  check_range_3x3:	
+   857 00000812 3C08                    	cmp		al,8
+   858 00000814 77AD                      ja		invalid_3x3
+   859                                  	; Range is valid
+   860 00000816 6780B8[ED010000]20      	cmpb	[board_3x3+eax],' '		; Is empty?
+   861 0000081E 75A3                      jne		invalid_3x3
+   862                                  	; Move is fully valid
+   863 00000820 8A1C25[F3000000]        	mov		bl,[mPXO+spot]
+   864 00000827 678898[ED010000]        	mov		[board_3x3+eax],bl		; Place mark
+   865                                  
+   866                                      ; Check if bomb hit before winning move 
+   867 0000082E E88CF9FFFF                  call check_bomb_3x3
+   868                                  	; Check if winning move
+   869 00000833 670FB688[B6030000]      	movzx		ecx, byte [kek_3x3+eax]	; Terms (adjusted)
+   870                                  pair:
+   871 0000083B 670FB6B4C1-             	movzx		esi, byte [lol_3x3+eax*8+ecx]
+   872 00000840 [6E030000]         
+   873 00000844 FFC9                    	dec		ecx
+   874 00000846 670FB6BCC1-             	movzx		edi, byte [lol_3x3+eax*8+ecx]
+   875 0000084B [6E030000]         
+   876 0000084F E876F8FFFF                  call	check_line_3x3
+   877 00000854 FFC9                    	dec		ecx
+   878 00000856 79E3                      jns		pair				; Next term pair
+   879 00000858 FE0C25[75030000]        	decb		[top_3x3]		; Check if tie
+   880 0000085F 0F84E2F8FFFF              jz		tie_3x3
+   881 00000865 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+   882 0000086D E960FFFFFF                jmp			play_3x3
+   883                                  
+   884                                  ; Game used for a 4x4 board 
+   885                                  game_4x4:
+   886                                  	
+   887                                  ; Player 1 places their bomb 
+   888                                  pXbomb_4x4:	
+   889 00000872 E8BEF7FFFF                   call	set_bomb	
+   890                                  ;Checks for valid input, if invalid reprompts user
+   891 00000877 3C0F                    	cmpb		al,15
+   892 00000879 760A                      jbe	switch_pO_4x4
+   893 0000087B E8EAFDFFFF                  call	invalid_bomb
+   894 00000880 E9EDFFFFFF                jmp	pXbomb_4x4
+   895                                  
+   896                                  ; Player 2 places their bomb 
+   897                                  switch_pO_4x4:
+   898 00000885 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Switch marks for next player
+   899                                  pObomb_4x4:	
+   900 0000088D E8A3F7FFFF                  call	set_bomb
+   901                                  ;Checks for valid input
+   902 00000892 3C0F                    	cmpb		al,15
+   903 00000894 760A                      jbe	check_debug_4x4
+   904 00000896 E8CFFDFFFF                  call	invalid_bomb
+   905 0000089B E9EDFFFFFF                jmp	pObomb_4x4
+   906                                  
+   907                                  ; Game continues after picking bomb location 
+   908                                  check_debug_4x4:
+   909 000008A0 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Switch marks for next player
+   910                                  	; Switch case
+   911 000008A8 803C25[08000000]59      	cmpb 		[dbuffer],'Y'
+   912 000008B0 742F                      je		do_debug_4x4
+   913 000008B2 803C25[08000000]79      	cmpb		[dbuffer],'y'
+   914 000008BA 7425                      je		do_debug_4x4
+   915 000008BC 803C25[08000000]44      	cmpb		[dbuffer],'D'
+   916 000008C4 741B                      je		do_debug_4x4
+   917 000008C6 803C25[08000000]64      	cmpb		[dbuffer],'d'
+   918 000008CE 7411                      je		do_debug_4x4
+   919                                  	; Default
+   920 000008D0 48C70425[0C000000]-     	movq		[pfunc],print_board_4x4
+   921 000008D8 [DA050000]         
+   922 000008DC E969000000                jmp		play_4x4
+   923                                  do_debug_4x4:
+   924 000008E1 48C70425[0C000000]-     	movq		[pfunc],debug_board_4x4
+   925 000008E9 [FC040000]         
+   926 000008ED B90F000000              	mov		ecx,15				; Offset of last hexdigit of address
+   927 000008F2 48BA-                   	mov		rdx, board_4x4			; rdx will be tampered with
+   928 000008F4 [1C02000000000000] 
+   929 000008FC 48BB-                   	mov		rbx, hexdigits			; Table
+   930 000008FE [0B03000000000000] 
+   931                                  memheader_4x4:	
+   932 00000906 4889D0                  	mov		rax,rdx				; Need nibble in al
+   933 00000909 48250F000000            	and		rax,0x000000000000000f
+   934 0000090F D7                      	xlatb						; al updated
+   935 00000910 678881[3B030000]        	mov 		byte[mboard+ecx],al
+   936 00000917 FFC9                    	dec		ecx
+   937 00000919 4889D0                  	mov		rax,rdx				; Need nibble in al
+   938 0000091C 4825F0000000            	and		rax,0x00000000000000f0
+   939 00000922 48C1E804                	shr		rax,4				; This time, higher nibble
+   940 00000926 D7                      	xlatb						; al updated
+   941 00000927 678881[3B030000]        	mov 		byte[mboard+ecx],al
+   942 0000092E 48C1EA08                	shr		rdx,8				; Next byte (two nibbles)
+   943 00000932 FFC9                    	dec		ecx
+   944 00000934 79D0                      jns		memheader_4x4
+   945 00000936 E90F000000                jmp		play_4x4
+   946                                  
+   947                                  invalid_4x4:
+   948 0000093B B9[A4010000]            	mov		ecx,merr			; Second argument: pointer to message to write
+   949 00000940 BA30000000              	mov		edx,merrl			; Third argument: message length
+   950 00000945 E8B6F6FFFF                  call	print_int
+   951                                  ; Fallthrough
+   952                                  play_4x4:
+   953                                  	; Print messages and board
+   954 0000094A B9[EC000000]            	mov		ecx,mPXO			; Second argument: pointer to message to write
+   955 0000094F BA08000000              	mov		edx,mPXOl			; Third argument: message length
+   956 00000954 E8A7F6FFFF                  call	print_int
+   957 00000959 B9[21010000]            	mov		ecx,mplay2_4x4			
+   958 0000095E BA2E000000              	mov		edx,mplay2l_4x4	
+   959 00000963 E898F6FFFF                  call	print_int
+   960 00000968 FF1425[0C000000]            call	[pfunc]
+   961                                  	; Read input
+   962 0000096F B9[00000000]            	mov		ecx,buffer			; Store input at location 'buffer'
+   963 00000974 BA08000000              	mov		edx,8 				; Read these many bytes
+   964 00000979 E88FF6FFFF                  call	read_int
+   965                                  	; Validate and convert
+   966 0000097E E894F6FFFF                  call	validate
+   967 00000983 6681F90A00              	cmp		cx,0xA
+   968 00000988 740F                      je		check_range_4x4
+   969 0000098A 803C25[02000000]0A      	cmpb		[buffer+2],0xA
+   970 00000992 75A7                      jne		invalid_4x4
+   971 00000994 E814F7FFFF                   call 	convert
+   972                                  check_range_4x4:	
+   973 00000999 3C0F                    	cmp		al,15
+   974 0000099B 779E                      ja		invalid_4x4
+   975                                  	; Range is valid
+   976 0000099D 6780B8[1C020000]20      	cmpb	[board_4x4+eax],' '			; Is empty?
+   977 000009A5 7594                      jne		invalid_4x4
+   978                                  	; Move is fully valid
+   979 000009A7 8A1C25[F3000000]        	mov		bl,[mPXO+spot]
+   980 000009AE 678898[1C020000]        	mov		[board_4x4+eax],bl		; Place mark
+   981                                  
+   982                                      ; Check if bomb hit before winning move 
+   983 000009B5 E884F8FFFF                  call check_bomb_4x4
+   984                                  	
+   985                                  	; Check if winning move
+   986 000009BA 670FB688[4F040000]      	movzx		ecx, byte [kek_4x4+eax]		; Terms (adjusted)
+   987                                  
+   988                                  triad:
+   989 000009C2 89CB                    	mov		ebx,ecx
+   990 000009C4 01C3                    	add		ebx,eax
+   991                                  
+   992 000009C6 670FB6B4C3-             	movzx		esi, byte [lol_4x4+eax*8+ebx]
+   993 000009CB [BF030000]         
+   994 000009CF FFCB                    	dec		ebx
+   995 000009D1 FFC9                    	dec		ecx
+   996 000009D3 670FB6BCC3-             	movzx		edi, byte [lol_4x4+eax*8+ebx]
+   997 000009D8 [BF030000]         
+   998 000009DC FFCB                    	dec		ebx
+   999 000009DE FFC9                    	dec		ecx
+  1000 000009E0 670FB694C3-             	movzx		edx, byte [lol_4x4+eax*8+ebx]
+  1001 000009E5 [BF030000]         
+  1002 000009E9 E8FAF6FFFF                  call	check_line_4x4
+  1003 000009EE FFC9                    	dec		ecx
+  1004 000009F0 79D0                      jns		triad				; Next term triad
+  1005 000009F2 FE0C25[CE030000]            	decb 		[top_4x4]			; Check if tie
+  1006 000009F9 0F846BF7FFFF              jz		tie_4x4
+  1007 000009FF 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+  1008 00000A07 E93EFFFFFF                jmp		play_4x4
+  1009                                  
+  1010                                  	
+  1011                                  ; Game used for a 5x5 board 
+  1012                                  game_5x5:
+  1013                                  	
+  1014                                  ; Player 1 places their bomb 
+  1015                                  pXbomb_5x5:	
+  1016 00000A0C E824F6FFFF                   call	set_bomb	
+  1017                                  ;Checks for valid input, if invalid reprompts user
+  1018 00000A11 3C18                    	cmpb		al,24
+  1019 00000A13 760A                      jbe	switch_pO_5x5
+  1020 00000A15 E850FCFFFF                  call	invalid_bomb
+  1021 00000A1A E9EDFFFFFF                jmp	pXbomb_5x5
+  1022                                  
+  1023                                  ; Player 2 places their bomb 
+  1024                                  switch_pO_5x5:
+  1025 00000A1F 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Switch marks for next player
+  1026                                  pObomb_5x5:	
+  1027 00000A27 E809F6FFFF              	call	set_bomb
+  1028                                  ;Checks for valid input
+  1029 00000A2C 3C18                    	cmpb		al,24
+  1030 00000A2E 760A                      jbe	check_debug_5x5
+  1031 00000A30 E835FCFFFF                  call	invalid_bomb
+  1032 00000A35 E9EDFFFFFF                jmp	pObomb_5x5
+  1033                                  
+  1034                                  ; Game continues after picking bomb location 
+  1035                                  check_debug_5x5:
+  1036 00000A3A 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Switch marks for next player
+  1037                                  	; Switch case
+  1038 00000A42 803C25[08000000]59      	cmpb 		[dbuffer],'Y'
+  1039 00000A4A 742F                      je		do_debug_5x5
+  1040 00000A4C 803C25[08000000]79      	cmpb		[dbuffer],'y'
+  1041 00000A54 7425                      je		do_debug_5x5
+  1042 00000A56 803C25[08000000]44      	cmpb		[dbuffer],'D'
+  1043 00000A5E 741B                      je		do_debug_5x5
+  1044 00000A60 803C25[08000000]64      	cmpb		[dbuffer],'d'
+  1045 00000A68 7411                      je		do_debug_5x5
+  1046                                  	; Default
+  1047 00000A6A 48C70425[0C000000]-     	movq		[pfunc],print_board_5x5
+  1048 00000A72 [22060000]         
+  1049 00000A76 E95D000000                jmp		play_5x5
+  1050                                  do_debug_5x5:
+  1051                                  	;movq		[pfunc],debug_board_5x5
+  1052 00000A7B B90F000000              	mov		ecx,15				; Offset of last hexdigit of address
+  1053 00000A80 48BA-                   	mov		rdx, board_4x4			; rdx will be tampered with
+  1054 00000A82 [1C02000000000000] 
+  1055 00000A8A 48BB-                   	mov		rbx, hexdigits			; Table
+  1056 00000A8C [0B03000000000000] 
+  1057                                  memheader_5x5:	
+  1058 00000A94 4889D0                  	mov		rax,rdx				; Need nibble in al
+  1059 00000A97 48250F000000            	and		rax,0x000000000000000f
+  1060 00000A9D D7                      	xlatb						; al updated
+  1061 00000A9E 678881[3B030000]        	mov 		byte[mboard+ecx],al
+  1062 00000AA5 FFC9                    	dec		ecx
+  1063 00000AA7 4889D0                  	mov		rax,rdx				; Need nibble in al
+  1064 00000AAA 4825F0000000            	and		rax,0x00000000000000f0
+  1065 00000AB0 48C1E804                	shr		rax,4				; This time, higher nibble
+  1066 00000AB4 D7                      	xlatb						; al updated
+  1067 00000AB5 678881[3B030000]        	mov 		byte[mboard+ecx],al
+  1068 00000ABC 48C1EA08                	shr		rdx,8				; Next byte (two nibbles)
+  1069 00000AC0 FFC9                    	dec		ecx
+  1070 00000AC2 79D0                      jns		memheader_5x5
+  1071 00000AC4 E90F000000                jmp		play_5x5
+  1072                                  
+  1073                                  invalid_5x5:
+  1074 00000AC9 B9[A4010000]            	mov		ecx,merr			; Second argument: pointer to message to write
+  1075 00000ACE BA30000000              	mov		edx,merrl			; Third argument: message length
+  1076 00000AD3 E828F5FFFF                  call	print_int
+  1077                                  ; Fallthrough
+  1078                                  play_5x5:
+  1079                                  	; Print messages and board
+  1080 00000AD8 B9[EC000000]            	mov		ecx,mPXO			; Second argument: pointer to message to write
+  1081 00000ADD BA08000000              	mov		edx,mPXOl			; Third argument: message length
+  1082 00000AE2 E819F5FFFF                  call	print_int
+  1083 00000AE7 B9[4F010000]            	mov		ecx,mplay2_5x5			
+  1084 00000AEC BA2E000000              	mov		edx,mplay2l_5x5	
+  1085 00000AF1 E80AF5FFFF                  call	print_int
+  1086 00000AF6 FF1425[0C000000]            call	[pfunc]
+  1087                                  	; Read input
+  1088 00000AFD B9[00000000]            	mov		ecx,buffer			; Store input at location 'buffer'
+  1089 00000B02 BA08000000              	mov		edx,8 				; Read these many bytes
+  1090 00000B07 E801F5FFFF                  call	read_int
+  1091                                  	; Validate and convert
+  1092 00000B0C E806F5FFFF                  call	validate
+  1093 00000B11 6681F90A00              	cmp		cx,0xA
+  1094 00000B16 740F                      je		check_range_5x5
+  1095 00000B18 803C25[02000000]0A      	cmpb		[buffer+2],0xA
+  1096 00000B20 75A7                      jne		invalid_5x5
+  1097 00000B22 E886F5FFFF                   call 	convert
+  1098                                  check_range_5x5:	
+  1099 00000B27 3C18                    	cmp		al,24
+  1100 00000B29 0F870CFEFFFF              ja		invalid_4x4
+  1101                                  	; Range is valid
+  1102 00000B2F 6780B8[59020000]20      	cmpb	[board_5x5+eax],' '			; Is empty?
+  1103 00000B37 7590                      jne		invalid_5x5
+  1104                                  	; Move is fully valid
+  1105 00000B39 8A1C25[F3000000]        	mov		bl,[mPXO+spot]
+  1106 00000B40 678898[59020000]        	mov		[board_5x5+eax],bl		; Place mark
+  1107                                  
+  1108                                      ; Check if bomb hit before winning move 
+  1109 00000B47 E871F7FFFF                  call check_bomb_5x5
+  1110                                  	
+  1111                                  	; Check if winning move
+  1112 00000B4C 670FB688[EF050000]      	movzx		ecx, byte [kek_5x5+eax]		; Terms (adjusted)
+  1113                                  tetrad:
+  1114 00000B54 4831DB                  	xor	rbx,rbx
+  1115 00000B57 4831D2                  	xor	rdx,rdx
+  1116 00000B5A 51                      		push	rcx		;Holds original count in stack
+  1117 00000B5B 50                      		push	rax		;Holds original input in stack
+  1118 00000B5C B308                    	mov	bl,8
+  1119 00000B5E F6EB                    	imul	bl
+  1120 00000B60 01C1                    	add		ecx,eax	;Calculates difference in lol_5x5 rows
+  1121 00000B62 58                      		pop	rax		;Returns original input
+  1122                                  
+  1123 00000B63 670FB6B4C1-             	movzx		esi, byte [lol_5x5+eax*8+ecx]
+  1124 00000B68 [5F040000]         
+  1125 00000B6C FFC9                    	dec		ecx
+  1126 00000B6E 670FB6BCC1-             	movzx		edi, byte [lol_5x5+eax*8+ecx]
+  1127 00000B73 [5F040000]         
+  1128 00000B77 FFC9                    	dec		ecx
+  1129 00000B79 670FB694C1-             	movzx		edx, byte [lol_5x5+eax*8+ecx]
+  1130 00000B7E [5F040000]         
+  1131 00000B82 FFC9                    	dec		ecx
+  1132 00000B84 670FB69CC1-             	movzx		ebx, byte [lol_5x5+eax*8+ecx]
+  1133 00000B89 [5F040000]         
+  1134                                  	
+  1135 00000B8D 59                      		pop	rcx	; Adjusting ecx to reflect actual count
+  1136 00000B8E FFC9                    	dec		ecx
+  1137 00000B90 FFC9                    	dec		ecx
+  1138 00000B92 FFC9                    	dec		ecx
+  1139 00000B94 E87BF5FFFF                  call	check_line_5x5
+  1140 00000B99 FFC9                    	dec		ecx
+  1141 00000B9B 79B7                      jns		tetrad				; Next term tetrad
+  1142 00000B9D FE0C25[77040000]            	decb 		[top_5x5]			; Check if tie
+  1143 00000BA4 0F84E3F5FFFF              jz		tie_5x5
+  1144 00000BAA 803425[F3000000]17      	xorb		[mPXO+spot],magic	; Ready the other player's mark
+  1145 00000BB2 E921FFFFFF                jmp		play_5x5
